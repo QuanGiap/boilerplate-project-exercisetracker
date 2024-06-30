@@ -42,24 +42,39 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
   const { description, duration, date = null } = req.body;
   const dateInsert = date ? new Date(date) : new Date();
   const { _id } = req.params;
-  const exercise = await exerciseModel.create({
+  const exercisePromise = exerciseModel.create({
     user_id: _id,
     duration: Number(duration),
     description,
     date: dateInsert,
   });
-  const user = await userModel.findById(_id);
+  const userPromise = userModel.findById(_id);
+  const [exercise,user] = await Promise.all([exercisePromise,userPromise]);
   return res.json({
-    username: user.username,
     _id: user._id,
+    username: user.username,
     description,
     duration,
-    date: dateInsert.toDateString(),
+    date: new Date(exercise.date).toDateString(),
   });
 });
 app.get("/api/users/:_id/logs", async (req, res) => {
   const { _id } = req.params;
-  const exercises = await exerciseModel.find({ user_id: _id });
+  const {from=null,to=null,limit=null} = req.query;
+  let queryFilter = {user_id: _id}
+  let dateObject = {};
+  if(from){
+    const beginDate = new Date(from);
+    dateObject['$gte'] = beginDate;
+  }
+  if(to){
+    const endDate = new Date(from);
+    dateObject['$lte'] = endDate;
+  }
+  if(from||to){
+    queryFilter['date']=dateObject;
+  }
+  const exercises = await exerciseModel.find(queryFilter).limit(Number(limit)||1000);
   const user = await userModel.findById(_id);
   return res.json({
     username: user.username,
